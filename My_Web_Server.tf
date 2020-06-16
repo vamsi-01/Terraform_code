@@ -1,8 +1,10 @@
+#Login using profile
 provider "aws"{
   profile ="vamsi"
   region ="ap-south-1"
 }
 
+#Creating a Key-Pair
 resource "tls_private_key" "key" {
   algorithm = "RSA"
 }
@@ -10,6 +12,8 @@ resource "aws_key_pair" "Mykey"{
   key_name   = "mykey"
   public_key = tls_private_key.key.public_key_openssh
 }
+
+#Storing the key locally
 resource "local_file" "keylocally" {
   content  = tls_private_key.key.private_key_pem
   filename = "mykey.pem"
@@ -19,6 +23,7 @@ resource "local_file" "keylocally" {
   ]
 }
 
+#Creating a Security-Group
 resource "aws_security_group" "Mysec_grp_tera" {
   name        = "Mysec_grp_tera"
   description = "Allow SSH and HTTP"
@@ -49,6 +54,8 @@ ingress {
 
 }
 
+#Creating an EC2 Instance and downloading softwares.
+
 resource "aws_instance" "WebOs" {
   ami           = "ami-0447a12f28fddb066"
   instance_type = "t2.micro"
@@ -75,6 +82,7 @@ resource "aws_instance" "WebOs" {
 
 }
 
+#Creating an EBS Volume
 
 resource "aws_ebs_volume" "ebs_tera" {
   availability_zone = aws_instance.WebOs.availability_zone
@@ -83,6 +91,8 @@ resource "aws_ebs_volume" "ebs_tera" {
     Name = "myweb"
   }
 }
+
+#Attaching the EBS volume to EC2 Instance.
 
 resource "aws_volume_attachment" "attach_ebs" {
   device_name = "/dev/sdb"
@@ -99,6 +109,7 @@ resource "null_resource" "save_ip"  {
   	}
 }
 
+#Formatting and Mounting the volume , also downloading developer code from Git-Hub into Web-server directory.
 
 resource "null_resource" "Run_cmds"  {
 
@@ -124,6 +135,8 @@ provisioner "remote-exec" {
   }
 }
 
+#Creating S3 Bucket.
+
 resource "aws_s3_bucket" "My_tera_bucket" {
   depends_on = [
 		null_resource.Run_cmds,
@@ -147,6 +160,9 @@ resource "aws_s3_bucket" "My_tera_bucket" {
 		command = "rd /S/Q Img_down"
 	}
 }
+
+#Creating an object for above S3 Bucket .
+
 resource "aws_s3_bucket_object" "Obj_bucket" {
   depends_on=[
       aws_s3_bucket.My_tera_bucket
@@ -160,6 +176,8 @@ resource "aws_s3_bucket_object" "Obj_bucket" {
 locals {
 	s3_origin_id = "S3-${aws_s3_bucket.My_tera_bucket.bucket}"
 }
+
+#Creating A CloudFront Distribution for S3 bucket.
 
 resource "aws_cloudfront_distribution" "Cloudfront-S3" {
 
@@ -211,9 +229,9 @@ resource "aws_cloudfront_distribution" "Cloudfront-S3" {
   	}
 }
 
+#Accessing Web-site
+
 resource "null_resource" "Auto_access"  {
-
-
 depends_on = [
    aws_cloudfront_distribution.Cloudfront-S3
   ]
